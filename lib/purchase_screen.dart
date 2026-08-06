@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'api_service.dart';
 import 'app_theme.dart';
 import 'device_service.dart';
+import 'reviews_screen.dart';
 
 class PurchaseScreen extends StatefulWidget {
   final Map<String, dynamic> note;
@@ -22,8 +23,11 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
 
   bool _isLoading = false;
   bool _purchaseCompleted = false;
+  bool _usedFreeTrialInThisPurchase = false;
+  bool _alreadyPurchased = false;
 
   String? _fileUrl;
+  String? _currentUserId;
   String? _resultMessage;
   String? _purchaseDate;
 
@@ -138,6 +142,8 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
       final String userId =
       await DeviceService.getDeviceId();
 
+      _currentUserId = userId;
+
       final Map<String, dynamic> result =
       await _apiService.purchaseNote(
         noteId: noteId,
@@ -169,8 +175,16 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
       final String fileUrl =
       _apiService.buildFileUrl(filePath);
 
+      final bool usedFreeTrial =
+          result["freeTrialUsed"] == true;
+
+      final bool alreadyPurchased =
+          result["alreadyPurchased"] == true;
+
       setState(() {
         _purchaseCompleted = true;
+        _usedFreeTrialInThisPurchase = usedFreeTrial;
+        _alreadyPurchased = alreadyPurchased;
         _fileUrl = fileUrl;
         _resultMessage = message;
         _purchaseDate = _formatDate(DateTime.now());
@@ -272,8 +286,8 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
       appBar: AppBar(
         title: Text(
           _purchaseCompleted
-              ? "Satın Alma Başarılı"
-              : "Satın Alma",
+              ? _successPageTitle
+              : "Not Erişimi",
         ),
       ),
       body: SingleChildScrollView(
@@ -288,6 +302,34 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             : _purchaseContent(),
       ),
     );
+  }
+
+  String get _successPageTitle {
+    if (_alreadyPurchased) {
+      return "PDF Erişimi";
+    }
+
+    if (_usedFreeTrialInThisPurchase) {
+      return "Ücretsiz İndirme Başarılı";
+    }
+
+    return "Satın Alma Başarılı";
+  }
+
+  String get _successTitle {
+    if (_alreadyPurchased) {
+      return "PDF Erişiminiz Hazır";
+    }
+
+    if (_usedFreeTrialInThisPurchase) {
+      return "İlk İndirmeniz Ücretsiz";
+    }
+
+    return "Satın Alma Başarılı";
+  }
+
+  String get _buttonText {
+    return "İndir / Satın Al • ${_formatMoney(_price)} TL";
   }
 
   Widget _purchaseContent() {
@@ -336,7 +378,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             label: Text(
               _isLoading
                   ? "İşlem Yapılıyor..."
-                  : "Satın Al • ${_formatMoney(_price)} TL",
+                  : _buttonText,
             ),
           ),
         ),
@@ -384,10 +426,10 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
 
               const SizedBox(height: 17),
 
-              const Text(
-                "Satın Alma Başarılı",
+              Text(
+                _successTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 21,
                   fontWeight: FontWeight.bold,
@@ -425,6 +467,50 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             ),
             label: const Text(
               "PDF'yi Aç",
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 11),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              final int? noteId = _noteId;
+              final String? userId = _currentUserId;
+
+              if (noteId == null) {
+                _showMessage(
+                  'Not kimliği alınamadı.',
+                );
+                return;
+              }
+
+              if (userId == null || userId.isEmpty) {
+                _showMessage(
+                  'Kullanıcı bilgisi alınamadı.',
+                );
+                return;
+              }
+
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (BuildContext context) {
+                    return ReviewsScreen(
+                      noteId: noteId,
+                      noteTitle: _title,
+                      userId: userId,
+                    );
+                  },
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.rate_review_rounded,
+            ),
+            label: const Text(
+              'Yorumları Gör ve Değerlendir',
             ),
           ),
         ),
@@ -545,7 +631,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
 
           _fileInformationRow(
             icon: Icons.calendar_today_rounded,
-            title: "Satın alma tarihi",
+            title: "Erişim tarihi",
             value: _purchaseDate ?? "-",
           ),
         ],
@@ -814,7 +900,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
           const Divider(height: 29),
 
           _summaryRow(
-            title: "Ödenecek toplam",
+            title: "Ücretsiz hakkınız yoksa toplam",
             value: "${_formatMoney(_price)} TL",
             color: AppColors.primaryLight,
             bold: true,

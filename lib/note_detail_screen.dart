@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
+import 'device_service.dart';
 import 'purchase_screen.dart';
+import 'report_screen.dart';
 
 class NoteDetailScreen extends StatelessWidget {
   final Map<String, dynamic> note;
@@ -266,8 +268,10 @@ class NoteDetailScreen extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) {
+                    MaterialPageRoute<void>(
+                      builder: (
+                          BuildContext context,
+                          ) {
                         return PurchaseScreen(
                           note: note,
                         );
@@ -281,6 +285,66 @@ class NoteDetailScreen extends StatelessWidget {
                 ),
                 label: Text(
                   "Satın Al • $price TL",
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final int? noteId =
+                  int.tryParse(
+                    note["id"]?.toString() ??
+                        "",
+                  );
+
+                  if (noteId == null) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Not kimliği alınamadı.",
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final String userId =
+                  await DeviceService
+                      .getDeviceId();
+
+                  if (!context.mounted) {
+                    return;
+                  }
+
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (
+                          BuildContext context,
+                          ) {
+                        return ReportScreen(
+                          noteId: noteId,
+                          noteTitle: title,
+                          userId: userId,
+                        );
+                      },
+                    ),
+                  );
+                },
+                icon: const Icon(
+                  Icons.flag_outlined,
+                  color: AppColors.error,
+                ),
+                label: const Text(
+                  "Notu Şikâyet Et",
+                  style: TextStyle(
+                    color: AppColors.error,
+                  ),
                 ),
               ),
             ),

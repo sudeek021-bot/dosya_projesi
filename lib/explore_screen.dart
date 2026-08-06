@@ -671,7 +671,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       const SizedBox(height: 6),
 
                       const Text(
-                        "Bugün hangi ders için not arıyorsun?",
+                        "Üniversite, ders veya konu adına göre arama yap.",
                         style: TextStyle(
                           color:
                           AppColors.textSecondary,
@@ -769,80 +769,66 @@ class _ExploreScreenState extends State<ExploreScreen> {
               color: AppColors.borderSoft,
             ),
           ),
-          child: Image.asset(
-            "assets/images/logo.png",
-            fit: BoxFit.contain,
-            errorBuilder: (
-                BuildContext context,
-                Object error,
-                StackTrace? stackTrace,
-                ) {
-              return const Icon(
-                Icons.folder_copy_rounded,
-                color: AppColors.primaryLight,
-                size: 31,
-              );
-            },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/images/notla_logo.png',
+              fit: BoxFit.cover,
+              errorBuilder: (
+                  BuildContext context,
+                  Object error,
+                  StackTrace? stackTrace,
+                  ) {
+                return const Icon(
+                  Icons.menu_book_rounded,
+                  color: AppColors.primaryLight,
+                  size: 31,
+                );
+              },
+            ),
           ),
         ),
-
         const SizedBox(width: 12),
-
-        const Expanded(
+        Expanded(
           child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                "Cadion",
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.3,
+              RichText(
+                text: const TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Not',
+                      style: TextStyle(
+                        color: Color(0xFFE8EEFF),
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'la',
+                      style: TextStyle(
+                        color: Color(0xFF9A45F5),
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 2),
-              Text(
-                "Öğrenci Not Platformu",
+              const SizedBox(height: 2),
+              const Text(
+                'Notunu paylaş, başkasına fayda sağla.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
             ],
-          ),
-        ),
-
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: AppColors.borderSoft,
-            ),
-          ),
-          child: IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context)
-                  .hideCurrentSnackBar();
-
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "Bildirim sistemi sonraki aşamada eklenecek.",
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: AppColors.primaryLight,
-              size: 22,
-            ),
           ),
         ),
       ],
@@ -1051,7 +1037,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _formatPrice(note["price"]);
 
     final String rating =
-    _formatRating(note["average_rating"]);
+    _formatRating(
+      note["average_rating"],
+    );
+
+    final String reviewCount =
+        note["review_count"]?.toString() ??
+            "0";
 
     final String downloadCount =
         note["download_count"]?.toString() ??
@@ -1198,7 +1190,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          rating,
+                          "$rating • $reviewCount yorum",
                           style: const TextStyle(
                             color: AppColors
                                 .textSecondary,

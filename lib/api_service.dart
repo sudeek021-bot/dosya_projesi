@@ -2,52 +2,147 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiService {
-  static const String _baseUrl = "http://10.0.2.2:3000/api";
+  static const String _baseUrl =
+      'http://10.0.2.2:3000/api';
+
+  static const String _serverUrl =
+      'http://10.0.2.2:3000';
 
   final Dio _dio = Dio(
     BaseOptions(
       baseUrl: _baseUrl,
-      connectTimeout: const Duration(seconds: 20),
-      receiveTimeout: const Duration(seconds: 40),
-      sendTimeout: const Duration(seconds: 60),
-      headers: const {
-        "Accept": "application/json",
+      connectTimeout:
+      const Duration(seconds: 20),
+      receiveTimeout:
+      const Duration(seconds: 40),
+      sendTimeout:
+      const Duration(seconds: 60),
+      headers: const <String, dynamic>{
+        'Accept': 'application/json',
       },
     ),
   );
 
   // =========================================================
+  // YARDIMCI FONKSİYONLAR
+  // =========================================================
+
+  Map<String, dynamic>? _mapFromData(
+      dynamic data,
+      ) {
+    if (data is Map) {
+      return Map<String, dynamic>.from(
+        data,
+      );
+    }
+
+    return null;
+  }
+
+  List<Map<String, dynamic>>
+  _mapListFromData(
+      dynamic data,
+      ) {
+    if (data is! List) {
+      return <Map<String, dynamic>>[];
+    }
+
+    final List<Map<String, dynamic>>
+    result =
+    <Map<String, dynamic>>[];
+
+    for (final dynamic item in data) {
+      if (item is Map) {
+        result.add(
+          Map<String, dynamic>.from(
+            item,
+          ),
+        );
+      }
+    }
+
+    return result;
+  }
+
+  String _extractErrorMessage(
+      DioException error, {
+        required String fallback,
+      }) {
+    final dynamic responseData =
+        error.response?.data;
+
+    if (responseData is Map) {
+      final dynamic errorValue =
+      responseData['error'];
+
+      final dynamic messageValue =
+      responseData['message'];
+
+      if (errorValue != null &&
+          errorValue
+              .toString()
+              .trim()
+              .isNotEmpty) {
+        return errorValue.toString();
+      }
+
+      if (messageValue != null &&
+          messageValue
+              .toString()
+              .trim()
+              .isNotEmpty) {
+        return messageValue.toString();
+      }
+    }
+
+    switch (error.type) {
+      case DioExceptionType.connectionError:
+        return 'Sunucuya bağlanılamadı. Node.js sunucusunun çalıştığından emin olun.';
+
+      case DioExceptionType.connectionTimeout:
+        return 'Sunucu bağlantısı zaman aşımına uğradı.';
+
+      case DioExceptionType.receiveTimeout:
+        return 'Sunucudan cevap alınamadı.';
+
+      case DioExceptionType.sendTimeout:
+        return 'Veriler sunucuya gönderilirken zaman aşımı oluştu.';
+
+      default:
+        return fallback;
+    }
+  }
+
+  // =========================================================
   // KULLANICI KONTROLÜ
+  // POST /api/users/check
   // =========================================================
 
   Future<Map<String, dynamic>?> checkUser(
       String deviceId,
       ) async {
     try {
-      final Response<dynamic> response = await _dio.post(
-        "/users/check",
-        data: {
-          "device_id": deviceId,
+      final Response<dynamic> response =
+      await _dio.post(
+        '/users/check',
+        data: <String, dynamic>{
+          'device_id': deviceId.trim(),
         },
       );
 
-      if (response.data is Map) {
-        return Map<String, dynamic>.from(
-          response.data,
-        );
-      }
-
-      return null;
+      return _mapFromData(
+        response.data,
+      );
     } on DioException catch (error) {
       debugPrint(
-        "Kullanıcı kontrol hatası: "
-            "${error.response?.data ?? error.message}",
+        'Kullanıcı kontrol hatası: '
+            '${error.response?.data ?? error.message}',
       );
 
       return null;
     } catch (error) {
       debugPrint(
-        "Kullanıcı kontrolünde beklenmeyen hata: $error",
+        'Kullanıcı kontrolünde beklenmeyen hata: $error',
       );
 
       return null;
@@ -56,36 +151,30 @@ class ApiService {
 
   // =========================================================
   // KATEGORİLERİ GETİR
+  // GET /api/categories
   // =========================================================
 
-  Future<List<Map<String, dynamic>>?> getCategories() async {
+  Future<List<Map<String, dynamic>>?>
+  getCategories() async {
     try {
-      final Response<dynamic> response = await _dio.get(
-        "/categories",
+      final Response<dynamic> response =
+      await _dio.get(
+        '/categories',
       );
 
-      if (response.data is! List) {
-        return [];
-      }
-
-      final List<dynamic> data =
-      List<dynamic>.from(response.data);
-
-      return data.map((dynamic item) {
-        return Map<String, dynamic>.from(
-          item as Map,
-        );
-      }).toList();
+      return _mapListFromData(
+        response.data,
+      );
     } on DioException catch (error) {
       debugPrint(
-        "Kategori listeleme hatası: "
-            "${error.response?.data ?? error.message}",
+        'Kategori listeleme hatası: '
+            '${error.response?.data ?? error.message}',
       );
 
       return null;
     } catch (error) {
       debugPrint(
-        "Kategori listelemede beklenmeyen hata: $error",
+        'Kategori listelemede beklenmeyen hata: $error',
       );
 
       return null;
@@ -94,6 +183,11 @@ class ApiService {
 
   // =========================================================
   // KEŞFET SAYFASI
+  // GET /api/notes/explore
+  //
+  // Backend eski sürümde doğrudan liste,
+  // yeni sürümde {"notes": [...]} döndürebilir.
+  // İki format da desteklenir.
   // =========================================================
 
   Future<List<dynamic>?> exploreNotes({
@@ -104,49 +198,77 @@ class ApiService {
     String? grade,
     String? category,
     String? educationType,
+    int page = 1,
+    int limit = 50,
   }) async {
     try {
-      final Response<dynamic> response = await _dio.get(
-        "/notes/explore",
-        queryParameters: {
-          if (search != null && search.trim().isNotEmpty)
-            "search": search.trim(),
-          if (city != null && city.trim().isNotEmpty)
-            "city": city.trim(),
+      final Response<dynamic> response =
+      await _dio.get(
+        '/notes/explore',
+        queryParameters: <String, dynamic>{
+          if (search != null &&
+              search.trim().isNotEmpty)
+            'search': search.trim(),
+          if (city != null &&
+              city.trim().isNotEmpty)
+            'city': city.trim(),
           if (district != null &&
               district.trim().isNotEmpty)
-            "district": district.trim(),
-          if (school != null && school.trim().isNotEmpty)
-            "school": school.trim(),
-          if (grade != null && grade.trim().isNotEmpty)
-            "grade": grade.trim(),
+            'district': district.trim(),
+          if (school != null &&
+              school.trim().isNotEmpty)
+            'school': school.trim(),
+          if (grade != null &&
+              grade.trim().isNotEmpty)
+            'grade': grade.trim(),
           if (category != null &&
               category.trim().isNotEmpty &&
-              category.trim() != "Tümü")
-            "category": category.trim(),
+              category.trim() != 'Tümü')
+            'category': category.trim(),
           if (educationType != null &&
-              educationType.trim().isNotEmpty)
-            "education_type": educationType.trim(),
+              educationType
+                  .trim()
+                  .isNotEmpty)
+            'education_type':
+            educationType.trim(),
+          'page': page,
+          'limit': limit,
         },
       );
 
       if (response.data is List) {
         return List<dynamic>.from(
-          response.data,
+          response.data as List,
         );
       }
 
-      return [];
+      if (response.data is Map) {
+        final Map<String, dynamic> data =
+        Map<String, dynamic>.from(
+          response.data as Map,
+        );
+
+        final dynamic notesValue =
+        data['notes'];
+
+        if (notesValue is List) {
+          return List<dynamic>.from(
+            notesValue,
+          );
+        }
+      }
+
+      return <dynamic>[];
     } on DioException catch (error) {
       debugPrint(
-        "Not listeleme hatası: "
-            "${error.response?.data ?? error.message}",
+        'Not listeleme hatası: '
+            '${error.response?.data ?? error.message}',
       );
 
       return null;
     } catch (error) {
       debugPrint(
-        "Not listelemede beklenmeyen hata: $error",
+        'Not listelemede beklenmeyen hata: $error',
       );
 
       return null;
@@ -154,48 +276,92 @@ class ApiService {
   }
 
   // =========================================================
-  // ÜNİVERSİTE ARAMA
+  // TEK NOT DETAYI
+  // GET /api/notes/:id
   // =========================================================
 
-  Future<List<Map<String, dynamic>>?> searchUniversities(
+  Future<Map<String, dynamic>>
+  getNoteDetail({
+    required int noteId,
+  }) async {
+    try {
+      final Response<dynamic> response =
+      await _dio.get(
+        '/notes/$noteId',
+      );
+
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
+
+      if (data == null) {
+        return <String, dynamic>{
+          'success': false,
+          'error':
+          'Not bilgileri okunamadı.',
+        };
+      }
+
+      return data;
+    } on DioException catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error': _extractErrorMessage(
+          error,
+          fallback:
+          'Not bilgileri getirilemedi.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
+      };
+    } catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        'Not bilgileri alınırken beklenmeyen bir hata oluştu.',
+      };
+    }
+  }
+
+  // =========================================================
+  // ÜNİVERSİTE ARAMA
+  // GET /api/universities/search
+  // =========================================================
+
+  Future<List<Map<String, dynamic>>?>
+  searchUniversities(
       String query,
       ) async {
-    final String cleanedQuery = query.trim();
+    final String cleanedQuery =
+    query.trim();
 
     if (cleanedQuery.length < 2) {
-      return [];
+      return <Map<String, dynamic>>[];
     }
 
     try {
-      final Response<dynamic> response = await _dio.get(
-        "/universities/search",
-        queryParameters: {
-          "q": cleanedQuery,
+      final Response<dynamic> response =
+      await _dio.get(
+        '/universities/search',
+        queryParameters: <String, dynamic>{
+          'q': cleanedQuery,
         },
       );
 
-      if (response.data is! List) {
-        return [];
-      }
-
-      final List<dynamic> data =
-      List<dynamic>.from(response.data);
-
-      return data.map((dynamic item) {
-        return Map<String, dynamic>.from(
-          item as Map,
-        );
-      }).toList();
+      return _mapListFromData(
+        response.data,
+      );
     } on DioException catch (error) {
       debugPrint(
-        "Üniversite arama hatası: "
-            "${error.response?.data ?? error.message}",
+        'Üniversite arama hatası: '
+            '${error.response?.data ?? error.message}',
       );
 
       return null;
     } catch (error) {
       debugPrint(
-        "Üniversite aramada beklenmeyen hata: $error",
+        'Üniversite aramada beklenmeyen hata: $error',
       );
 
       return null;
@@ -204,6 +370,7 @@ class ApiService {
 
   // =========================================================
   // NOT VE PDF YÜKLEME
+  // POST /api/notes/upload
   // =========================================================
 
   Future<Map<String, dynamic>> uploadNote({
@@ -226,173 +393,184 @@ class ApiService {
         filename: fileName,
       );
 
-      final FormData formData = FormData.fromMap({
-        "document": pdfFile,
-        "title": title.trim(),
-        "description": description.trim(),
-        "category_id": categoryId.toString(),
-        "university_id": universityId.toString(),
-        "course_id": courseId.toString(),
-        "education_type": educationType.trim(),
-        "grade_level": gradeLevel.trim(),
-        "price": price.toStringAsFixed(2),
-        "user_id": userId,
-      });
+      final FormData formData =
+      FormData.fromMap(
+        <String, dynamic>{
+          'document': pdfFile,
+          'title': title.trim(),
+          'description':
+          description.trim(),
+          'category_id':
+          categoryId.toString(),
+          'university_id':
+          universityId.toString(),
+          'course_id':
+          courseId.toString(),
+          'education_type':
+          educationType.trim(),
+          'grade_level':
+          gradeLevel.trim(),
+          'price':
+          price.toStringAsFixed(2),
+          'user_id': userId.trim(),
+        },
+      );
 
-      final Response<dynamic> response = await _dio.post(
-        "/notes/upload",
+      final Response<dynamic> response =
+      await _dio.post(
+        '/notes/upload',
         data: formData,
         options: Options(
-          contentType: "multipart/form-data",
+          contentType:
+          'multipart/form-data',
         ),
       );
 
-      String message = "Not başarıyla yüklendi.";
-      dynamic noteId;
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
 
-      if (response.data is Map) {
-        final Map<String, dynamic> data =
-        Map<String, dynamic>.from(
-          response.data,
-        );
+      final dynamic noteValue =
+      data?['note'];
 
-        message =
-            data["message"]?.toString() ?? message;
+      dynamic noteId =
+      data?['note_id'];
 
-        noteId = data["note_id"];
+      if (noteId == null &&
+          noteValue is Map) {
+        noteId = noteValue['id'];
       }
 
-      return {
-        "success": true,
-        "message": message,
-        "note_id": noteId,
+      return <String, dynamic>{
+        'success': true,
+        'message':
+        data?['message']?.toString() ??
+            'Not başarıyla yüklendi.',
+        'note_id': noteId,
+        if (noteValue != null)
+          'note': noteValue,
       };
     } on DioException catch (error) {
-      String message = "Not yüklenemedi.";
-
-      final dynamic responseData =
-          error.response?.data;
-
-      if (responseData is Map) {
-        message =
-            responseData["error"]?.toString() ??
-                message;
-      } else if (error.type ==
-          DioExceptionType.connectionError) {
-        message =
-        "Sunucuya bağlanılamadı. Node.js sunucusunu kontrol edin.";
-      } else if (error.type ==
-          DioExceptionType.sendTimeout) {
-        message =
-        "PDF yükleme işlemi zaman aşımına uğradı.";
-      }
-
-      return {
-        "success": false,
-        "message": message,
+      return <String, dynamic>{
+        'success': false,
+        'message':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Not yüklenemedi.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
       };
     } catch (error) {
-      return {
-        "success": false,
-        "message":
-        "Not yüklenirken beklenmeyen bir hata oluştu.",
+      debugPrint(
+        'Not yükleme beklenmeyen hata: $error',
+      );
+
+      return <String, dynamic>{
+        'success': false,
+        'message':
+        'Not yüklenirken beklenmeyen bir hata oluştu.',
       };
     }
   }
 
   // =========================================================
   // NOT SATIN ALMA
+  // POST /api/notes/purchase
   // =========================================================
 
-  Future<Map<String, dynamic>> purchaseNote({
+  Future<Map<String, dynamic>>
+  purchaseNote({
     required int noteId,
     required String userId,
   }) async {
     try {
-      final Response<dynamic> response = await _dio.post(
-        "/notes/purchase",
-        data: {
-          "note_id": noteId,
-          "user_id": userId,
+      final Response<dynamic> response =
+      await _dio.post(
+        '/notes/purchase',
+        data: <String, dynamic>{
+          'note_id': noteId,
+          'user_id': userId.trim(),
         },
       );
 
-      if (response.data is Map) {
-        final Map<String, dynamic> data =
-        Map<String, dynamic>.from(
-          response.data,
-        );
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
 
-        return {
-          "success": true,
-          "message":
-          data["message"]?.toString() ??
-              "Satın alma tamamlandı.",
-          "filePath": data["filePath"]?.toString(),
-          "freeTrialUsed":
-          data["freeTrialUsed"] == true,
-          "alreadyPurchased":
-          data["alreadyPurchased"] == true,
+      if (data == null) {
+        return <String, dynamic>{
+          'success': true,
+          'message':
+          'Satın alma tamamlandı.',
         };
       }
 
-      return {
-        "success": true,
-        "message": "Satın alma tamamlandı.",
+      return <String, dynamic>{
+        'success': true,
+        'message':
+        data['message']?.toString() ??
+            'Satın alma tamamlandı.',
+        'filePath':
+        data['filePath']?.toString(),
+        'freeTrialUsed':
+        data['freeTrialUsed'] == true,
+        'alreadyPurchased':
+        data['alreadyPurchased'] ==
+            true,
       };
     } on DioException catch (error) {
-      String message =
-          "Satın alma işlemi tamamlanamadı.";
-
-      if (error.response?.data is Map) {
-        message =
-            error.response?.data["error"]?.toString() ??
-                message;
-      }
-
-      return {
-        "success": false,
-        "message": message,
-        "statusCode": error.response?.statusCode,
+      return <String, dynamic>{
+        'success': false,
+        'message':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Satın alma işlemi tamamlanamadı.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
       };
     } catch (error) {
-      return {
-        "success": false,
-        "message":
-        "Satın alma sırasında beklenmeyen bir hata oluştu.",
+      return <String, dynamic>{
+        'success': false,
+        'message':
+        'Satın alma sırasında beklenmeyen bir hata oluştu.',
       };
     }
   }
 
   // =========================================================
   // CÜZDAN BİLGİLERİ
+  // GET /api/wallet/:userId
   // =========================================================
 
-  Future<Map<String, dynamic>?> getWallet(
+  Future<Map<String, dynamic>?>
+  getWallet(
       String userId,
       ) async {
     try {
-      final Response<dynamic> response = await _dio.get(
-        "/wallet/$userId",
+      final Response<dynamic> response =
+      await _dio.get(
+        '/wallet/${userId.trim()}',
       );
 
-      if (response.data is Map) {
-        return Map<String, dynamic>.from(
-          response.data,
-        );
-      }
-
-      return null;
+      return _mapFromData(
+        response.data,
+      );
     } on DioException catch (error) {
       debugPrint(
-        "Cüzdan getirme hatası: "
-            "${error.response?.data ?? error.message}",
+        'Cüzdan getirme hatası: '
+            '${error.response?.data ?? error.message}',
       );
 
       return null;
     } catch (error) {
       debugPrint(
-        "Cüzdan getirmede beklenmeyen hata: $error",
+        'Cüzdan getirmede beklenmeyen hata: $error',
       );
 
       return null;
@@ -401,55 +579,343 @@ class ApiService {
 
   // =========================================================
   // PARA ÇEKME
+  // POST /api/wallet/withdraw
   // =========================================================
 
-  Future<Map<String, dynamic>> createWithdrawRequest({
+  Future<Map<String, dynamic>>
+  createWithdrawRequest({
     required String userId,
     required String iban,
     required double amount,
   }) async {
     try {
-      final Response<dynamic> response = await _dio.post(
-        "/wallet/withdraw",
-        data: {
-          "user_id": userId,
-          "iban": iban.trim(),
-          "amount": amount,
+      final Response<dynamic> response =
+      await _dio.post(
+        '/wallet/withdraw',
+        data: <String, dynamic>{
+          'user_id': userId.trim(),
+          'iban': iban.trim(),
+          'amount': amount,
         },
       );
 
-      String message =
-          "Para çekme talebi oluşturuldu.";
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
 
-      if (response.data is Map) {
-        message =
-            response.data["message"]?.toString() ??
-                message;
-      }
-
-      return {
-        "success": true,
-        "message": message,
+      return <String, dynamic>{
+        'success': true,
+        'message':
+        data?['message']?.toString() ??
+            'Para çekme talebi oluşturuldu.',
+        if (data?['withdrawal'] != null)
+          'withdrawal':
+          data!['withdrawal'],
+        if (data?['remaining_balance'] !=
+            null)
+          'remaining_balance':
+          data!['remaining_balance'],
       };
     } on DioException catch (error) {
-      String message =
-          "Para çekme talebi oluşturulamadı.";
-
-      if (error.response?.data is Map) {
-        message =
-            error.response?.data["error"]?.toString() ??
-                message;
-      }
-
-      return {
-        "success": false,
-        "message": message,
+      return <String, dynamic>{
+        'success': false,
+        'message':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Para çekme talebi oluşturulamadı.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
       };
     } catch (error) {
-      return {
-        "success": false,
-        "message":
-        "Para çekme sırasında beklenmeyen bir hata oluştu.",
+      return <String, dynamic>{
+        'success': false,
+        'message':
+        'Para çekme sırasında beklenmeyen bir hata oluştu.',
+      };
+    }
+  }
+
+  // =========================================================
+  // YORUMLARI GETİR
+  // GET /api/notes/:noteId/reviews
+  // =========================================================
+
+  Future<Map<String, dynamic>>
+  getReviews({
+    required int noteId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final Response<dynamic> response =
+      await _dio.get(
+        '/notes/$noteId/reviews',
+        queryParameters: <String, dynamic>{
+          'page': page,
+          'limit': limit,
+        },
+      );
+
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
+
+      if (data == null) {
+        return <String, dynamic>{
+          'success': false,
+          'error':
+          'Yorum verileri okunamadı.',
+        };
+      }
+
+      return data;
+    } on DioException catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Yorumlar alınamadı.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
+      };
+    } catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        'Yorumlar alınırken beklenmeyen bir hata oluştu.',
+      };
+    }
+  }
+
+  // =========================================================
+  // YORUM YETKİSİ KONTROLÜ
+  // GET /api/notes/:noteId/review-permission/:userId
+  // =========================================================
+
+  Future<Map<String, dynamic>>
+  reviewPermission({
+    required int noteId,
+    required String userId,
+  }) async {
+    try {
+      final Response<dynamic> response =
+      await _dio.get(
+        '/notes/$noteId/review-permission/${userId.trim()}',
+      );
+
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
+
+      if (data == null) {
+        return <String, dynamic>{
+          'success': false,
+          'can_review': false,
+          'error':
+          'Yorum yetkisi okunamadı.',
+        };
+      }
+
+      return data;
+    } on DioException catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'can_review': false,
+        'error':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Yorum yetkisi kontrol edilemedi.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
+      };
+    } catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'can_review': false,
+        'error':
+        'Yorum yetkisi kontrol edilirken beklenmeyen bir hata oluştu.',
+      };
+    }
+  }
+
+  // =========================================================
+  // YORUM EKLE
+  // POST /api/notes/:noteId/reviews
+  // =========================================================
+
+  Future<Map<String, dynamic>>
+  addReview({
+    required int noteId,
+    required String userId,
+    required int rating,
+    required String comment,
+  }) async {
+    try {
+      final Response<dynamic> response =
+      await _dio.post(
+        '/notes/$noteId/reviews',
+        data: <String, dynamic>{
+          'user_id': userId.trim(),
+          'rating': rating,
+          'comment': comment.trim(),
+        },
+      );
+
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
+
+      if (data == null) {
+        return <String, dynamic>{
+          'success': true,
+          'message':
+          'Yorumunuz eklendi.',
+        };
+      }
+
+      return data;
+    } on DioException catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Yorum eklenemedi.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
+      };
+    } catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        'Yorum eklenirken beklenmeyen bir hata oluştu.',
+      };
+    }
+  }
+
+  // =========================================================
+  // YORUM GÜNCELLE
+  // PUT /api/notes/:noteId/reviews/:reviewId
+  // =========================================================
+
+  Future<Map<String, dynamic>>
+  updateReview({
+    required int noteId,
+    required int reviewId,
+    required String userId,
+    required int rating,
+    required String comment,
+  }) async {
+    try {
+      final Response<dynamic> response =
+      await _dio.put(
+        '/notes/$noteId/reviews/$reviewId',
+        data: <String, dynamic>{
+          'user_id': userId.trim(),
+          'rating': rating,
+          'comment': comment.trim(),
+        },
+      );
+
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
+
+      if (data == null) {
+        return <String, dynamic>{
+          'success': true,
+          'message':
+          'Yorum güncellendi.',
+        };
+      }
+
+      return data;
+    } on DioException catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Yorum güncellenemedi.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
+      };
+    } catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        'Yorum güncellenirken beklenmeyen bir hata oluştu.',
+      };
+    }
+  }
+
+  // =========================================================
+  // YORUM SİL
+  // DELETE /api/notes/:noteId/reviews/:reviewId
+  // =========================================================
+
+  Future<Map<String, dynamic>>
+  deleteReview({
+    required int noteId,
+    required int reviewId,
+    required String userId,
+  }) async {
+    try {
+      final Response<dynamic> response =
+      await _dio.delete(
+        '/notes/$noteId/reviews/$reviewId',
+        data: <String, dynamic>{
+          'user_id': userId.trim(),
+        },
+      );
+
+      final Map<String, dynamic>? data =
+      _mapFromData(
+        response.data,
+      );
+
+      if (data == null) {
+        return <String, dynamic>{
+          'success': true,
+          'message':
+          'Yorum silindi.',
+        };
+      }
+
+      return data;
+    } on DioException catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        _extractErrorMessage(
+          error,
+          fallback:
+          'Yorum silinemedi.',
+        ),
+        'statusCode':
+        error.response?.statusCode,
+      };
+    } catch (error) {
+      return <String, dynamic>{
+        'success': false,
+        'error':
+        'Yorum silinirken beklenmeyen bir hata oluştu.',
       };
     }
   }
@@ -458,20 +924,41 @@ class ApiService {
   // PDF ADRESİ OLUŞTURMA
   // =========================================================
 
-  String buildFileUrl(String? filePath) {
-    if (filePath == null || filePath.trim().isEmpty) {
-      return "";
+  String buildFileUrl(
+      String? filePath,
+      ) {
+    if (filePath == null ||
+        filePath.trim().isEmpty) {
+      return '';
     }
 
-    if (filePath.startsWith("http://") ||
-        filePath.startsWith("https://")) {
-      return filePath;
+    final String cleanedPath =
+    filePath.trim();
+
+    if (cleanedPath.startsWith(
+      'http://',
+    ) ||
+        cleanedPath.startsWith(
+          'https://',
+        )) {
+      return cleanedPath;
     }
 
-    if (filePath.startsWith("/uploads/")) {
-      return "http://10.0.2.2:3000$filePath";
+    if (cleanedPath.startsWith(
+      '/uploads/',
+    )) {
+      return '$_serverUrl$cleanedPath';
     }
 
-    return "http://10.0.2.2:3000/uploads/$filePath";
+    final String normalizedPath =
+        cleanedPath
+            .replaceAll(
+          '\\',
+          '/',
+        )
+            .split('/')
+            .last;
+
+    return '$_serverUrl/uploads/$normalizedPath';
   }
 }
