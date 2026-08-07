@@ -5,15 +5,34 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DeviceService {
+  // =========================================================
+  // TEST KULLANICI AYARI
+  // =========================================================
+
   static const String _testUserKey =
       'cadion_selected_test_user';
 
+  // Bunlar users.id DEĞİL.
+  // Backend'deki users.device_id değerleridir.
+
+  // user_id = 1
+  // Satıcı test kullanıcısı
   static const String userOne =
       'test_cihaz_id';
 
+  // user_id = 2
+  // Alıcı test kullanıcısı
   static const String userTwo =
-      '2';
-  static const String userThree = '3';
+      'UE1A.230829.050';
+
+  // user_id = 6
+  // Ek test kullanıcısı
+  static const String userThree =
+      'test_cihaz_1';
+
+  // =========================================================
+  // AKTİF CİHAZ / TEST KULLANICI KİMLİĞİNİ GETİR
+  // =========================================================
 
   static Future<String> getDeviceId() async {
     final SharedPreferences preferences =
@@ -24,25 +43,29 @@ class DeviceService {
       _testUserKey,
     );
 
-    if (
-    selectedTestUser != null &&
-        selectedTestUser.trim().isNotEmpty
-    ) {
+    // Test kullanıcısı seçilmişse gerçek cihaz
+    // kimliği yerine seçilen test device_id kullanılır.
+    if (selectedTestUser != null &&
+        selectedTestUser.trim().isNotEmpty) {
       return selectedTestUser.trim();
     }
 
     return _getRealDeviceId();
   }
 
-  static Future<void> setTestUser(
-      String userId,
-      ) async {
-    final String normalizedUserId =
-    userId.trim();
+  // =========================================================
+  // TEST KULLANICISI SEÇ
+  // =========================================================
 
-    if (normalizedUserId.isEmpty) {
+  static Future<void> setTestUser(
+      String deviceId,
+      ) async {
+    final String normalizedDeviceId =
+    deviceId.trim();
+
+    if (normalizedDeviceId.isEmpty) {
       throw ArgumentError(
-        'Kullanıcı kimliği boş olamaz.',
+        'Cihaz kimliği boş olamaz.',
       );
     }
 
@@ -51,9 +74,14 @@ class DeviceService {
 
     await preferences.setString(
       _testUserKey,
-      normalizedUserId,
+      normalizedDeviceId,
     );
   }
+
+  // =========================================================
+  // 1. TEST KULLANICISI
+  // user_id = 1 / SATICI
+  // =========================================================
 
   static Future<void>
   useFirstTestUser() async {
@@ -62,15 +90,34 @@ class DeviceService {
     );
   }
 
+  // =========================================================
+  // 2. TEST KULLANICISI
+  // user_id = 2 / ALICI
+  // =========================================================
+
   static Future<void>
   useSecondTestUser() async {
     await setTestUser(
       userTwo,
     );
   }
-  static Future<void> useThirdTestUser() async {
-    await setTestUser(userThree);
+
+  // =========================================================
+  // 3. TEST KULLANICISI
+  // user_id = 6
+  // =========================================================
+
+  static Future<void>
+  useThirdTestUser() async {
+    await setTestUser(
+      userThree,
+    );
   }
+
+  // =========================================================
+  // TEST MODUNU KAPAT
+  // =========================================================
+
   static Future<void>
   clearTestUser() async {
     final SharedPreferences preferences =
@@ -81,10 +128,18 @@ class DeviceService {
     );
   }
 
+  // =========================================================
+  // SEÇİLİ KULLANICI / CİHAZ KİMLİĞİ
+  // =========================================================
+
   static Future<String>
   getSelectedUserId() async {
     return getDeviceId();
   }
+
+  // =========================================================
+  // GERÇEK CİHAZ KİMLİĞİ
+  // =========================================================
 
   static Future<String>
   _getRealDeviceId() async {
@@ -113,4 +168,3 @@ class DeviceService {
     return 'unknown_device';
   }
 }
-

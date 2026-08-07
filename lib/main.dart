@@ -7,7 +7,7 @@ import 'main_layout.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await DeviceService.useFirstTestUser();
+  await DeviceService.useSecondTestUser();
 
   runApp(const DersNotuApp());
 }

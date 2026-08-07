@@ -3,676 +3,1007 @@ import 'package:flutter/material.dart';
 import 'app_theme.dart';
 import 'notification_service.dart';
 
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen
+    extends StatefulWidget {
   const NotificationsScreen({
     super.key,
     required this.userId,
     this.onNotificationsChanged,
   });
 
+  // DeviceService'ten gelen device_id
   final String userId;
 
   final Future<void> Function()?
   onNotificationsChanged;
 
   @override
-  State<NotificationsScreen> createState() =>
+  State<NotificationsScreen>
+  createState() =>
       _NotificationsScreenState();
 }
 
 class _NotificationsScreenState
     extends State<NotificationsScreen> {
-  late final NotificationService
-  _notificationService;
+late final NotificationService
+_notificationService;
 
-  bool _isLoading = true;
-  bool _isMarkingAll = false;
+bool _isLoading = true;
+bool _isMarkingAll = false;
 
-  String? _errorMessage;
+String? _errorMessage;
 
-  List<Map<String, dynamic>> _notifications =
-  <Map<String, dynamic>>[];
+List<Map<String, dynamic>>
+_notifications =
+<Map<String, dynamic>>[];
 
-  @override
-  void initState() {
-    super.initState();
+@override
+void initState() {
+super.initState();
 
-    _notificationService =
-        NotificationService(
-          userId: widget.userId,
-        );
+_notificationService =
+NotificationService(
+userId:
+widget.userId,
+);
 
-    _loadNotifications();
-  }
+_loadNotifications();
+}
 
-  Future<void> _loadNotifications() async {
-    if (!mounted) {
-      return;
-    }
+// =========================================================
+// BİLDİRİMLERİ YÜKLE
+// =========================================================
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+Future<void>
+_loadNotifications() async {
+if (!mounted) {
+return;
+}
 
-    final Map<String, dynamic> result =
-    await _notificationService
-        .getNotifications(
-      page: 1,
-      limit: 50,
-    );
+setState(() {
+_isLoading =
+true;
 
-    if (!mounted) {
-      return;
-    }
+_errorMessage =
+null;
+});
 
-    if (result['success'] != true) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage =
-            result['error']?.toString() ??
-                'Bildirimler yüklenemedi.';
-      });
+try {
+final Map<String, dynamic> result =
+await _notificationService
+.getNotifications(
+page:
+1,
 
-      return;
-    }
+limit:
+50,
+);
 
-    final dynamic notificationsValue =
-    result['notifications'];
+if (!mounted) {
+return;
+}
 
-    final List<Map<String, dynamic>>
-    notifications =
-    <Map<String, dynamic>>[];
+if (result['success'] != true) {
+setState(() {
+_isLoading =
+false;
 
-    if (notificationsValue is List) {
-      for (final dynamic item
-      in notificationsValue) {
-        if (item is Map) {
-          notifications.add(
-            Map<String, dynamic>.from(
-              item,
-            ),
-          );
-        }
-      }
-    }
+_notifications =
+<Map<String, dynamic>>[];
 
-    setState(() {
-      _isLoading = false;
-      _notifications = notifications;
-    });
+_errorMessage =
+result['error']
+?.toString() ??
+'Bildirimler yüklenemedi.';
+});
 
-    await widget.onNotificationsChanged
-        ?.call();
-  }
+return;
+}
 
-  Future<void> _markAsRead(
-      Map<String, dynamic> notification,
-      ) async {
-    final bool isRead =
-    _toBool(
-      notification['is_read'],
-    );
+final dynamic notificationsValue =
+result['notifications'];
 
-    if (isRead) {
-      return;
-    }
+final List<Map<String, dynamic>>
+notifications =
+<Map<String, dynamic>>[];
 
-    final int? notificationId =
-    int.tryParse(
-      notification['id']?.toString() ??
-          '',
-    );
+if (notificationsValue is List) {
+for (
+final dynamic item
+in notificationsValue
+) {
+if (item is Map) {
+notifications.add(
+Map<String, dynamic>.from(
+item,
+),
+);
+}
+}
+}
 
-    if (notificationId == null) {
-      return;
-    }
+setState(() {
+_notifications =
+notifications;
 
-    final Map<String, dynamic> result =
-    await _notificationService
-        .markAsRead(
-      notificationId,
-    );
+_isLoading =
+false;
 
-    if (!mounted) {
-      return;
-    }
+_errorMessage =
+null;
+});
 
-    if (result['success'] != true) {
-      _showMessage(
-        result['error']?.toString() ??
-            'Bildirim güncellenemedi.',
-        success: false,
-      );
+await widget
+.onNotificationsChanged
+?.call();
+} catch (error) {
+if (!mounted) {
+return;
+}
 
-      return;
-    }
+setState(() {
+_isLoading =
+false;
 
-    setState(() {
-      notification['is_read'] = 1;
-    });
+_notifications =
+<Map<String, dynamic>>[];
 
-    await widget.onNotificationsChanged
-        ?.call();
-  }
+_errorMessage =
+'Bildirimler yüklenirken beklenmeyen bir hata oluştu.';
+});
+}
+}
 
-  Future<void> _markAllAsRead() async {
-    if (_isMarkingAll) {
-      return;
-    }
+// =========================================================
+// TEK BİLDİRİMİ OKUNDU YAP
+// =========================================================
 
-    final bool hasUnread =
-    _notifications.any(
-          (
-          Map<String, dynamic>
-          notification,
-          ) {
-        return !_toBool(
-          notification['is_read'],
-        );
-      },
-    );
+Future<bool> _markAsRead(
+Map<String, dynamic> notification,
+) async {
+final bool isRead =
+_toBool(
+notification['is_read'],
+);
 
-    if (!hasUnread) {
-      _showMessage(
-        'Okunmamış bildiriminiz bulunmuyor.',
-        success: true,
-      );
+if (isRead) {
+return true;
+}
 
-      return;
-    }
+final int? notificationId =
+int.tryParse(
+notification['id']
+?.toString() ??
+'',
+);
 
-    setState(() {
-      _isMarkingAll = true;
-    });
+if (notificationId == null) {
+_showMessage(
+'Bildirim kimliği alınamadı.',
+success:
+false,
+);
 
-    final Map<String, dynamic> result =
-    await _notificationService
-        .markAllAsRead();
+return false;
+}
 
-    if (!mounted) {
-      return;
-    }
+final Map<String, dynamic> result =
+await _notificationService
+.markAsRead(
+notificationId,
+);
 
-    setState(() {
-      _isMarkingAll = false;
-    });
+if (!mounted) {
+return false;
+}
 
-    if (result['success'] != true) {
-      _showMessage(
-        result['error']?.toString() ??
-            'Bildirimler güncellenemedi.',
-        success: false,
-      );
+if (result['success'] != true) {
+_showMessage(
+result['error']
+?.toString() ??
+'Bildirim güncellenemedi.',
+success:
+false,
+);
 
-      return;
-    }
+return false;
+}
 
-    setState(() {
-      for (
-      final Map<String, dynamic>
-      notification
-      in _notifications
-      ) {
-        notification['is_read'] = 1;
-      }
-    });
+setState(() {
+notification['is_read'] =
+1;
+});
 
-    await widget.onNotificationsChanged
-        ?.call();
+await widget
+.onNotificationsChanged
+?.call();
 
-    if (!mounted) {
-      return;
-    }
+return true;
+}
 
-    _showMessage(
-      'Tüm bildirimler okundu olarak işaretlendi.',
-      success: true,
-    );
-  }
+// =========================================================
+// TÜMÜNÜ OKUNDU YAP
+// =========================================================
 
-  void _showMessage(
-      String message, {
-        required bool success,
-      }) {
-    ScaffoldMessenger.of(context)
-        .hideCurrentSnackBar();
+Future<void>
+_markAllAsRead() async {
+if (_isMarkingAll) {
+return;
+}
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              success
-                  ? Icons
-                  .check_circle_rounded
-                  : Icons
-                  .error_outline_rounded,
-              color: success
-                  ? AppColors.success
-                  : AppColors.error,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(message),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+final bool hasUnread =
+_notifications.any(
+(
+Map<String, dynamic>
+notification,
+) {
+return !_toBool(
+notification['is_read'],
+);
+},
+);
 
-  bool _toBool(dynamic value) {
-    if (value is bool) {
-      return value;
-    }
+if (!hasUnread) {
+_showMessage(
+'Okunmamış bildiriminiz bulunmuyor.',
+success:
+true,
+);
 
-    if (value is num) {
-      return value == 1;
-    }
+return;
+}
 
-    return value?.toString() == '1' ||
-        value
-            ?.toString()
-            .toLowerCase() ==
-            'true';
-  }
+setState(() {
+_isMarkingAll =
+true;
+});
 
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return Scaffold(
-      backgroundColor:
-      AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'Bildirimler',
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed:
-            _isMarkingAll
-                ? null
-                : _markAllAsRead,
-            icon: _isMarkingAll
-                ? const SizedBox(
-              width: 17,
-              height: 17,
-              child:
-              CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
-            )
-                : const Icon(
-              Icons.done_all_rounded,
-              size: 19,
-            ),
-            label: const Text(
-              'Tümünü Oku',
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadNotifications,
-        child: _buildBody(),
-      ),
-    );
-  }
+try {
+final Map<String, dynamic> result =
+await _notificationService
+.markAllAsRead();
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return ListView(
-        physics:
-        AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(height: 260),
-          Center(
-            child:
-            CircularProgressIndicator(),
-          ),
-        ],
-      );
-    }
+if (!mounted) {
+return;
+}
 
-    if (_errorMessage != null) {
-      return ListView(
-        physics:
-        const AlwaysScrollableScrollPhysics(),
-        padding:
-        const EdgeInsets.all(24),
-        children: [
-          const SizedBox(height: 130),
-          const Icon(
-            Icons.cloud_off_rounded,
-            color: AppColors.error,
-            size: 64,
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Bildirimler yüklenemedi',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color:
-              AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight:
-              FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _errorMessage!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color:
-              AppColors.textSecondary,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 22),
-          ElevatedButton.icon(
-            onPressed:
-            _loadNotifications,
-            icon: const Icon(
-              Icons.refresh_rounded,
-            ),
-            label: const Text(
-              'Tekrar Dene',
-            ),
-          ),
-        ],
-      );
-    }
+if (result['success'] != true) {
+_showMessage(
+result['error']
+?.toString() ??
+'Bildirimler güncellenemedi.',
+success:
+false,
+);
 
-    if (_notifications.isEmpty) {
-      return ListView(
-        physics:
-        const AlwaysScrollableScrollPhysics(),
-        padding:
-        const EdgeInsets.all(24),
-        children: [
-          const SizedBox(height: 145),
-          Center(
-            child: Container(
-              width: 84,
-              height: 84,
-              decoration:
-              BoxDecoration(
-                color: AppColors.primary
-                    .withValues(
-                  alpha: 0.12,
-                ),
-                borderRadius:
-                BorderRadius.circular(
-                  26,
-                ),
-              ),
-              child: const Icon(
-                Icons
-                    .notifications_none_rounded,
-                color:
-                AppColors.primary,
-                size: 45,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Henüz bildiriminiz yok',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color:
-              AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight:
-              FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Not satışları, onaylar ve para çekme işlemleri burada görünecek.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color:
-              AppColors.textSecondary,
-              fontSize: 13,
-              height: 1.45,
-            ),
-          ),
-        ],
-      );
-    }
+return;
+}
 
-    return ListView.separated(
-      physics:
-      const AlwaysScrollableScrollPhysics(),
-      padding:
-      const EdgeInsets.fromLTRB(
-        16,
-        14,
-        16,
-        28,
-      ),
-      itemCount:
-      _notifications.length,
-      separatorBuilder:
-          (
-          BuildContext context,
-          int index,
-          ) {
-        return const SizedBox(
-          height: 11,
-        );
-      },
-      itemBuilder:
-          (
-          BuildContext context,
-          int index,
-          ) {
-        return _buildNotificationCard(
-          _notifications[index],
-        );
-      },
-    );
-  }
+setState(() {
+for (
+final Map<String, dynamic>
+notification
+in _notifications
+) {
+notification['is_read'] =
+1;
+}
+});
 
-  Widget _buildNotificationCard(
-      Map<String, dynamic> notification,
-      ) {
-    final bool isRead =
-    _toBool(
-      notification['is_read'],
-    );
+await widget
+.onNotificationsChanged
+?.call();
 
-    final String type =
-        notification['type']
-            ?.toString() ??
-            'announcement';
+if (!mounted) {
+return;
+}
 
-    final String title =
-        notification['title']
-            ?.toString() ??
-            'Bildirim';
+_showMessage(
+'Tüm bildirimler okundu olarak işaretlendi.',
+success:
+true,
+);
+} finally {
+if (mounted) {
+setState(() {
+_isMarkingAll =
+false;
+});
+}
+}
+}
 
-    final String message =
-        notification['message']
-            ?.toString() ??
-            '';
+// =========================================================
+// MESAJ
+// =========================================================
 
-    final String createdAt =
-        notification['created_at']
-            ?.toString() ??
-            '';
+void _showMessage(
+String message, {
+required bool success,
+}) {
+if (!mounted) {
+return;
+}
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () async {
-          await _markAsRead(
-            notification,
-          );
-        },
-        borderRadius:
-        BorderRadius.circular(
-          20,
-        ),
-        child: AnimatedContainer(
-          duration:
-          const Duration(
-            milliseconds: 220,
-          ),
-          width: double.infinity,
-          padding:
-          const EdgeInsets.all(
-            16,
-          ),
-          decoration:
-          BoxDecoration(
-            color: isRead
-                ? const Color(
-              0xFF101D30,
-            )
-                : AppColors.primary
-                .withValues(
-              alpha: 0.10,
-            ),
-            borderRadius:
-            BorderRadius.circular(
-              20,
-            ),
-            border: Border.all(
-              color: isRead
-                  ? AppColors.border
-                  : AppColors.primary
-                  .withValues(
-                alpha: 0.32,
-              ),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              _buildNotificationIcon(
-                type,
-              ),
-              const SizedBox(
-                width: 13,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
-                  children: [
-                    Row(
-                      crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style:
-                            TextStyle(
-                              color:
-                              AppColors
-                                  .textPrimary,
-                              fontSize:
-                              15,
-                              fontWeight:
-                              isRead
-                                  ? FontWeight
-                                  .w600
-                                  : FontWeight
-                                  .w800,
-                            ),
-                          ),
-                        ),
-                        if (!isRead) ...[
-                          const SizedBox(
-                            width: 9,
-                          ),
-                          Container(
-                            width: 9,
-                            height: 9,
-                            margin:
-                            const EdgeInsets
-                                .only(
-                              top: 5,
-                            ),
-                            decoration:
-                            const BoxDecoration(
-                              color:
-                              AppColors
-                                  .primary,
-                              shape:
-                              BoxShape
-                                  .circle,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(
-                      height: 6,
-                    ),
-                    Text(
-                      message,
-                      style:
-                      const TextStyle(
-                        color: AppColors
-                            .textSecondary,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 10,
-                    ),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons
-                              .schedule_rounded,
-                          color:
-                          AppColors
-                              .textMuted,
-                          size: 15,
-                        ),
-                        const SizedBox(
-                          width: 5,
-                        ),
-                        Expanded(
-                          child: Text(
-                            _formatDate(
-                              createdAt,
-                            ),
-                            style:
-                            const TextStyle(
-                              color:
-                              AppColors
-                                  .textMuted,
-                              fontSize:
-                              11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+ScaffoldMessenger.of(context)
+.hideCurrentSnackBar();
+
+ScaffoldMessenger.of(context)
+.showSnackBar(
+SnackBar(
+content:
+Row(
+children: [
+Icon(
+success
+? Icons.check_circle_rounded
+: Icons.error_outline_rounded,
+
+color:
+success
+? AppColors.success
+: AppColors.error,
+),
+
+const SizedBox(
+width:
+10,
+),
+
+Expanded(
+child:
+Text(
+message,
+),
+),
+],
+),
+),
+);
+}
+
+bool _toBool(
+dynamic value,
+) {
+if (value is bool) {
+return value;
+}
+
+if (value is num) {
+return value ==
+1;
+}
+
+final String text =
+value
+?.toString()
+.toLowerCase() ??
+'';
+
+return text == '1' ||
+text == 'true';
+}
+// =========================================================
+// ANA EKRAN
+// =========================================================
+
+@override
+Widget build(
+BuildContext context,
+) {
+return Scaffold(
+backgroundColor:
+AppColors.background,
+
+appBar: AppBar(
+title:
+const Text(
+'Bildirimler',
+),
+
+actions: [
+TextButton.icon(
+onPressed:
+_isMarkingAll
+? null
+: _markAllAsRead,
+
+icon:
+_isMarkingAll
+? const SizedBox(
+width: 17,
+height: 17,
+child:
+CircularProgressIndicator(
+strokeWidth: 2,
+),
+)
+: const Icon(
+Icons.done_all_rounded,
+size: 19,
+),
+
+label:
+const Text(
+'Tümünü Oku',
+),
+),
+
+const SizedBox(
+width: 8,
+),
+],
+),
+
+body:
+RefreshIndicator(
+color:
+AppColors.primaryLight,
+
+onRefresh:
+_loadNotifications,
+
+child:
+_buildBody(),
+),
+);
+}
+
+// =========================================================
+// SAYFA İÇERİĞİ
+// =========================================================
+
+Widget _buildBody() {
+// =======================================================
+// YÜKLENİYOR
+// =======================================================
+
+if (_isLoading) {
+return ListView(
+physics:
+const AlwaysScrollableScrollPhysics(),
+
+children:
+const [
+SizedBox(
+height: 260,
+),
+
+Center(
+child:
+CircularProgressIndicator(),
+),
+],
+);
+}
+
+// =======================================================
+// HATA
+// =======================================================
+
+if (_errorMessage != null) {
+return ListView(
+physics:
+const AlwaysScrollableScrollPhysics(),
+
+padding:
+const EdgeInsets.all(
+24,
+),
+
+children: [
+const SizedBox(
+height: 130,
+),
+
+const Icon(
+Icons.cloud_off_rounded,
+color:
+AppColors.error,
+size:
+64,
+),
+
+const SizedBox(
+height: 18,
+),
+
+const Text(
+'Bildirimler yüklenemedi',
+
+textAlign:
+TextAlign.center,
+
+style:
+TextStyle(
+color:
+AppColors.textPrimary,
+
+fontSize:
+18,
+
+fontWeight:
+FontWeight.w700,
+),
+),
+
+const SizedBox(
+height: 8,
+),
+
+Text(
+_errorMessage!,
+
+textAlign:
+TextAlign.center,
+
+style:
+const TextStyle(
+color:
+AppColors.textSecondary,
+
+fontSize:
+13,
+),
+),
+
+const SizedBox(
+height: 22,
+),
+
+ElevatedButton.icon(
+onPressed:
+_loadNotifications,
+
+icon:
+const Icon(
+Icons.refresh_rounded,
+),
+
+label:
+const Text(
+'Tekrar Dene',
+),
+),
+],
+);
+}
+
+// =======================================================
+// HİÇ BİLDİRİM YOK
+// =======================================================
+
+if (_notifications.isEmpty) {
+return ListView(
+physics:
+const AlwaysScrollableScrollPhysics(),
+
+padding:
+const EdgeInsets.all(
+24,
+),
+
+children: [
+const SizedBox(
+height: 145,
+),
+
+Center(
+child:
+Container(
+width:
+84,
+
+height:
+84,
+
+decoration:
+BoxDecoration(
+color:
+AppColors.primary
+.withValues(
+alpha: 0.12,
+),
+
+borderRadius:
+BorderRadius.circular(
+26,
+),
+),
+
+child:
+const Icon(
+Icons.notifications_none_rounded,
+
+color:
+AppColors.primary,
+
+size:
+45,
+),
+),
+),
+
+const SizedBox(
+height: 20,
+),
+
+const Text(
+'Henüz bildiriminiz yok',
+
+textAlign:
+TextAlign.center,
+
+style:
+TextStyle(
+color:
+AppColors.textPrimary,
+
+fontSize:
+18,
+
+fontWeight:
+FontWeight.w700,
+),
+),
+
+const SizedBox(
+height: 8,
+),
+
+const Text(
+'Not satışları, yorumlar, onaylar ve para çekme işlemleri burada görünecek.',
+
+textAlign:
+TextAlign.center,
+
+style:
+TextStyle(
+color:
+AppColors.textSecondary,
+
+fontSize:
+13,
+
+height:
+1.45,
+),
+),
+],
+);
+}
+
+// =======================================================
+// BİLDİRİM LİSTESİ
+// =======================================================
+
+return ListView.separated(
+physics:
+const AlwaysScrollableScrollPhysics(),
+
+padding:
+const EdgeInsets.fromLTRB(
+16,
+14,
+16,
+28,
+),
+
+itemCount:
+_notifications.length,
+
+separatorBuilder:
+(
+BuildContext context,
+int index,
+) {
+return const SizedBox(
+height: 11,
+);
+},
+
+itemBuilder:
+(
+BuildContext context,
+int index,
+) {
+return _buildNotificationCard(
+_notifications[index],
+);
+},
+);
+}
+
+// =========================================================
+// BİLDİRİM KARTI
+// =========================================================
+
+Widget _buildNotificationCard(
+Map<String, dynamic> notification,
+) {
+final bool isRead =
+_toBool(
+notification['is_read'],
+);
+
+final String type =
+notification['type']
+?.toString() ??
+'announcement';
+
+final String title =
+notification['title']
+?.toString() ??
+'Bildirim';
+
+final String message =
+notification['message']
+?.toString() ??
+'';
+
+final String createdAt =
+notification['created_at']
+?.toString() ??
+'';
+
+// Backend'den gelen referans bilgileri.
+// Bir sonraki aşamada bildirime tıklayınca
+// ilgili not/işlem ekranına gitmek için kullanacağız.
+final String referenceType =
+notification['reference_type']
+?.toString() ??
+'';
+
+final int? referenceId =
+int.tryParse(
+notification['reference_id']
+?.toString() ??
+'',
+);
+
+final bool hasReference =
+referenceType.isNotEmpty &&
+referenceId != null;
+
+return Material(
+color:
+Colors.transparent,
+
+child:
+InkWell(
+onTap:
+() async {
+final bool success =
+await _markAsRead(
+notification,
+);
+
+if (!success ||
+!mounted) {
+return;
+}
+
+// Şimdilik bildirim okundu olarak işaretleniyor.
+// referenceType/referenceId hazır tutuluyor.
+// İlgili ekran yönlendirmesini sonraki aşamada
+// mevcut route yapımıza göre bağlayacağız.
+},
+
+borderRadius:
+BorderRadius.circular(
+20,
+),
+
+child:
+AnimatedContainer(
+duration:
+const Duration(
+milliseconds:
+220,
+),
+
+width:
+double.infinity,
+
+padding:
+const EdgeInsets.all(
+16,
+),
+
+decoration:
+BoxDecoration(
+color:
+isRead
+? const Color(
+0xFF101D30,
+)
+: AppColors.primary
+.withValues(
+alpha:
+0.10,
+),
+
+borderRadius:
+BorderRadius.circular(
+20,
+),
+
+border:
+Border.all(
+color:
+isRead
+? AppColors.border
+: AppColors.primary
+.withValues(
+alpha:
+0.32,
+),
+),
+),
+
+child:
+Row(
+crossAxisAlignment:
+CrossAxisAlignment.start,
+
+children: [
+_buildNotificationIcon(
+type,
+),
+
+const SizedBox(
+width:
+13,
+),
+
+Expanded(
+child:
+Column(
+crossAxisAlignment:
+CrossAxisAlignment.start,
+
+children: [
+Row(
+crossAxisAlignment:
+CrossAxisAlignment.start,
+
+children: [
+Expanded(
+child:
+Text(
+title,
+
+style:
+TextStyle(
+color:
+AppColors.textPrimary,
+
+fontSize:
+15,
+
+fontWeight:
+isRead
+? FontWeight.w600
+: FontWeight.w800,
+),
+),
+),
+
+if (!isRead) ...[
+const SizedBox(
+width:
+9,
+),
+
+Container(
+width:
+9,
+
+height:
+9,
+
+margin:
+const EdgeInsets.only(
+top:
+5,
+),
+
+decoration:
+const BoxDecoration(
+color:
+AppColors.primary,
+
+shape:
+BoxShape.circle,
+),
+),
+],
+],
+),
+
+const SizedBox(
+height:
+6,
+),
+
+Text(
+message,
+
+style:
+const TextStyle(
+color:
+AppColors.textSecondary,
+
+fontSize:
+13,
+
+height:
+1.4,
+),
+),
+
+const SizedBox(
+height:
+10,
+),
+
+Row(
+children: [
+const Icon(
+Icons.schedule_rounded,
+
+color:
+AppColors.textMuted,
+
+size:
+15,
+),
+
+const SizedBox(
+width:
+5,
+),
+
+Expanded(
+child:
+Text(
+_formatDate(
+createdAt,
+),
+
+style:
+const TextStyle(
+color:
+AppColors.textMuted,
+
+fontSize:
+11,
+),
+),
+),
+
+if (hasReference)
+const Icon(
+Icons.chevron_right_rounded,
+color:
+AppColors.textMuted,
+size:
+19,
+),
+],
+),
+],
+),
+),
+],
+),
+),
+),
+);
+}
+  // =========================================================
+  // BİLDİRİM İKONU
+  // =========================================================
 
   Widget _buildNotificationIcon(
       String type,
@@ -761,25 +1092,40 @@ class _NotificationsScreenState
     }
 
     return Container(
-      width: 48,
-      height: 48,
+      width:
+      48,
+
+      height:
+      48,
+
       decoration:
       BoxDecoration(
-        color: color.withValues(
-          alpha: 0.13,
+        color:
+        color.withValues(
+          alpha:
+          0.13,
         ),
+
         borderRadius:
         BorderRadius.circular(
           15,
         ),
       ),
-      child: Icon(
+
+      child:
+      Icon(
         icon,
-        color: color,
-        size: 25,
+        color:
+        color,
+        size:
+        25,
       ),
     );
   }
+
+  // =========================================================
+  // TARİH FORMATLA
+  // =========================================================
 
   String _formatDate(
       String value,
@@ -808,37 +1154,26 @@ class _NotificationsScreenState
       localDate,
     );
 
-    if (difference.isNegative) {
-      return 'Az önce';
-    }
-
     if (
-    difference.inMinutes < 1
+    difference.isNegative ||
+        difference.inMinutes < 1
     ) {
       return 'Az önce';
     }
 
-    if (
-    difference.inMinutes < 60
-    ) {
+    if (difference.inMinutes < 60) {
       return '${difference.inMinutes} dakika önce';
     }
 
-    if (
-    difference.inHours < 24
-    ) {
+    if (difference.inHours < 24) {
       return '${difference.inHours} saat önce';
     }
 
-    if (
-    difference.inDays == 1
-    ) {
+    if (difference.inDays == 1) {
       return 'Dün';
     }
 
-    if (
-    difference.inDays < 7
-    ) {
+    if (difference.inDays < 7) {
       return '${difference.inDays} gün önce';
     }
 

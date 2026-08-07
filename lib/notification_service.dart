@@ -2,262 +2,392 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 class NotificationService {
-  NotificationService({
-    required this.userId,
-  }) {
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(
-          seconds: 20,
-        ),
-        receiveTimeout: const Duration(
-          seconds: 20,
-        ),
-        sendTimeout: const Duration(
-          seconds: 20,
-        ),
-        headers: <String, dynamic>{
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        validateStatus: (int? status) {
-          return status != null &&
-              status >= 200 &&
-              status < 600;
-        },
-      ),
-    );
-  }
+NotificationService({
+required this.userId,
+}) {
+_dio = Dio(
+BaseOptions(
+baseUrl: baseUrl,
+connectTimeout: const Duration(
+seconds: 20,
+),
+receiveTimeout: const Duration(
+seconds: 20,
+),
+sendTimeout: const Duration(
+seconds: 20,
+),
+headers: <String, dynamic>{
+'Accept': 'application/json',
+'Content-Type': 'application/json',
+},
+validateStatus: (int? status) {
+return status != null &&
+status >= 200 &&
+status < 600;
+},
+),
+);
+}
 
-  final String userId;
+// DeviceService'ten gelen device_id
+final String userId;
 
-  late final Dio _dio;
+late final Dio _dio;
 
-  // =======================================================
-  // API ADRESİ
-  // =======================================================
+// Backend'deki gerçek sayısal users.id
+int? _numericUserId;
 
-  static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:3000';
-    }
+// =======================================================
+// API ADRESİ
+// =======================================================
 
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return 'http://10.0.2.2:3000';
+static String get baseUrl {
+if (kIsWeb) {
+return 'http://localhost:3000';
+}
 
-      case TargetPlatform.iOS:
-      case TargetPlatform.windows:
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-        return 'http://localhost:3000';
+switch (defaultTargetPlatform) {
+case TargetPlatform.android:
+return 'http://10.0.2.2:3000';
 
-      default:
-        return 'http://localhost:3000';
-    }
-  }
+case TargetPlatform.iOS:
+case TargetPlatform.windows:
+case TargetPlatform.linux:
+case TargetPlatform.macOS:
+return 'http://localhost:3000';
 
-  // =======================================================
-  // BİLDİRİMLERİ GETİR
-  // =======================================================
+default:
+return 'http://localhost:3000';
+}
+}
 
-  Future<Map<String, dynamic>> getNotifications({
-    int page = 1,
-    int limit = 20,
-  }) async {
-    return _get(
-      '/api/notifications/'
-          '${Uri.encodeComponent(userId)}',
-      queryParameters: <String, dynamic>{
-        'page': page,
-        'limit': limit,
-      },
-    );
-  }
+// =======================================================
+// DEVICE_ID -> SAYISAL USER_ID
+// =======================================================
 
-  // =======================================================
-  // OKUNMAMIŞ BİLDİRİM SAYISI
-  // =======================================================
+Future<int?> _resolveNumericUserId() async {
+if (_numericUserId != null) {
+return _numericUserId;
+}
 
-  Future<Map<String, dynamic>>
-  getUnreadCount() async {
-    return _get(
-      '/api/notifications/'
-          '${Uri.encodeComponent(userId)}'
-          '/unread-count',
-    );
-  }
+final String deviceId =
+userId.trim();
 
-  // =======================================================
-  // TEK BİLDİRİMİ OKUNDU YAP
-  // =======================================================
+if (deviceId.isEmpty) {
+return null;
+}
 
-  Future<Map<String, dynamic>> markAsRead(
-      int notificationId,
-      ) async {
-    return _post(
-      '/api/notifications/'
-          '$notificationId/read',
-      data: <String, dynamic>{
-        'user_id': userId,
-      },
-    );
-  }
+try {
+final Response<dynamic> response =
+await _dio.post(
+'/api/users/check',
+data: <String, dynamic>{
+'device_id': deviceId,
+},
+);
 
-  // =======================================================
-  // TÜM BİLDİRİMLERİ OKUNDU YAP
-  // =======================================================
+final Map<String, dynamic> data =
+_convertToMap(
+response.data,
+);
 
-  Future<Map<String, dynamic>>
-  markAllAsRead() async {
-    return _post(
-      '/api/notifications/read-all',
-      data: <String, dynamic>{
-        'user_id': userId,
-      },
-    );
-  }
+final int? numericId =
+int.tryParse(
+data['user_id']?.toString() ??
+'',
+);
 
-  // =======================================================
-  // CİHAZ KAYDET
-  // =======================================================
+if (numericId == null ||
+numericId <= 0) {
+return null;
+}
 
-  Future<Map<String, dynamic>> registerDevice({
-    required String deviceId,
-    String? fcmToken,
-    String platform = 'android',
-  }) async {
-    return _post(
-      '/api/notifications/device',
-      data: <String, dynamic>{
-        'user_id': userId,
-        'device_id': deviceId.trim(),
-        'fcm_token': fcmToken?.trim(),
-        'platform': platform.trim(),
-      },
-    );
-  }
+_numericUserId =
+numericId;
 
-  // =======================================================
-  // TEST BİLDİRİMİ OLUŞTUR
-  // =======================================================
+return numericId;
+} on DioException catch (error) {
+debugPrint(
+'Bildirim kullanıcı çözümleme hatası: '
+'${error.response?.data ?? error.message}',
+);
 
-  Future<Map<String, dynamic>>
-  createTestNotification() async {
-    return _post(
-      '/api/notifications/test',
-      data: <String, dynamic>{
-        'user_id': userId,
-      },
-    );
-  }
+return null;
+} catch (error) {
+debugPrint(
+'Bildirim kullanıcı çözümleme beklenmeyen hata: '
+'$error',
+);
 
-  // =======================================================
-  // GET İSTEĞİ
-  // =======================================================
+return null;
+}
+}
 
-  Future<Map<String, dynamic>> _get(
-      String endpoint, {
-        Map<String, dynamic>?
-        queryParameters,
-      }) async {
-    try {
-      final Response<dynamic> response =
-      await _dio.get<dynamic>(
-        endpoint,
-        queryParameters:
-        queryParameters,
-      );
+// =======================================================
+// BİLDİRİMLERİ GETİR
+// =======================================================
 
-      return _parseResponse(response);
-    } on DioException catch (error) {
-      debugPrint(
-        'Bildirim GET hatası: ${error.message}',
-      );
+Future<Map<String, dynamic>>
+getNotifications({
+int page = 1,
+int limit = 20,
+}) async {
+final int? numericUserId =
+await _resolveNumericUserId();
 
-      return _handleDioException(error);
-    } catch (error) {
-      debugPrint(
-        'Bildirim GET beklenmeyen hata: $error',
-      );
+if (numericUserId == null) {
+return _userResolutionError();
+}
 
-      return _connectionError();
-    }
-  }
+return _get(
+'/api/notifications/$numericUserId',
+queryParameters: <String, dynamic>{
+'page': page,
+'limit': limit,
+},
+);
+}
 
-  // =======================================================
-  // POST İSTEĞİ
-  // =======================================================
+// =======================================================
+// OKUNMAMIŞ BİLDİRİM SAYISI
+// =======================================================
 
-  Future<Map<String, dynamic>> _post(
-      String endpoint, {
-        Map<String, dynamic>? data,
-      }) async {
-    try {
-      final Response<dynamic> response =
-      await _dio.post<dynamic>(
-        endpoint,
-        data: data ??
-            <String, dynamic>{},
-      );
+Future<Map<String, dynamic>>
+getUnreadCount() async {
+final int? numericUserId =
+await _resolveNumericUserId();
 
-      return _parseResponse(response);
-    } on DioException catch (error) {
-      debugPrint(
-        'Bildirim POST hatası: ${error.message}',
-      );
+if (numericUserId == null) {
+return _userResolutionError();
+}
 
-      return _handleDioException(error);
-    } catch (error) {
-      debugPrint(
-        'Bildirim POST beklenmeyen hata: $error',
-      );
+return _get(
+'/api/notifications/'
+'$numericUserId'
+'/unread-count',
+);
+}
 
-      return _connectionError();
-    }
-  }
+// =======================================================
+// TEK BİLDİRİMİ OKUNDU YAP
+// =======================================================
 
-  // =======================================================
-  // CEVABI DÖNÜŞTÜR
-  // =======================================================
+Future<Map<String, dynamic>>
+markAsRead(
+int notificationId,
+) async {
+final int? numericUserId =
+await _resolveNumericUserId();
 
-  Map<String, dynamic> _parseResponse(
-      Response<dynamic> response,
-      ) {
-    final int statusCode =
-        response.statusCode ?? 0;
+if (numericUserId == null) {
+return _userResolutionError();
+}
 
-    final Map<String, dynamic> data =
-    _convertToMap(
-      response.data,
-    );
+return _post(
+'/api/notifications/'
+'$notificationId'
+'/read',
+data: <String, dynamic>{
+'user_id': numericUserId,
+},
+);
+}
 
-    if (
-    statusCode >= 200 &&
-        statusCode < 300
-    ) {
-      data.putIfAbsent(
-        'success',
-            () => true,
-      );
+// =======================================================
+// TÜM BİLDİRİMLERİ OKUNDU YAP
+// =======================================================
 
-      data['status_code'] =
-          statusCode;
+Future<Map<String, dynamic>>
+markAllAsRead() async {
+final int? numericUserId =
+await _resolveNumericUserId();
 
-      return data;
-    }
+if (numericUserId == null) {
+return _userResolutionError();
+}
 
-    return <String, dynamic>{
-      ...data,
-      'success': false,
-      'status_code': statusCode,
-      'error':
-      data['error']?.toString() ??
-          'İşlem gerçekleştirilemedi.',
-    };
-  }
+return _post(
+'/api/notifications/read-all',
+data: <String, dynamic>{
+'user_id': numericUserId,
+},
+);
+}
+// =======================================================
+// CİHAZ KAYDET
+// =======================================================
 
+Future<Map<String, dynamic>>
+registerDevice({
+required String deviceId,
+String? fcmToken,
+String platform = 'android',
+}) async {
+final int? numericUserId =
+await _resolveNumericUserId();
+
+if (numericUserId == null) {
+return _userResolutionError();
+}
+
+return _post(
+'/api/notifications/device',
+data: <String, dynamic>{
+'user_id':
+numericUserId,
+'device_id':
+deviceId.trim(),
+'fcm_token':
+fcmToken?.trim(),
+'platform':
+platform.trim(),
+},
+);
+}
+
+// =======================================================
+// TEST BİLDİRİMİ OLUŞTUR
+// =======================================================
+
+Future<Map<String, dynamic>>
+createTestNotification() async {
+final int? numericUserId =
+await _resolveNumericUserId();
+
+if (numericUserId == null) {
+return _userResolutionError();
+}
+
+return _post(
+'/api/notifications/test',
+data: <String, dynamic>{
+'user_id':
+numericUserId,
+},
+);
+}
+
+// =======================================================
+// GET İSTEĞİ
+// =======================================================
+
+Future<Map<String, dynamic>> _get(
+String endpoint, {
+Map<String, dynamic>?
+queryParameters,
+}) async {
+try {
+final Response<dynamic> response =
+await _dio.get(
+endpoint,
+queryParameters:
+queryParameters,
+);
+
+return _parseResponse(
+response,
+);
+} on DioException catch (error) {
+debugPrint(
+'Bildirim GET hatası: '
+'${error.response?.data ?? error.message}',
+);
+
+return _handleDioException(
+error,
+);
+} catch (error) {
+debugPrint(
+'Bildirim GET beklenmeyen hata: '
+'$error',
+);
+
+return _connectionError();
+}
+}
+
+// =======================================================
+// POST İSTEĞİ
+// =======================================================
+
+Future<Map<String, dynamic>> _post(
+String endpoint, {
+Map<String, dynamic>? data,
+}) async {
+try {
+final Response<dynamic> response =
+await _dio.post(
+endpoint,
+data:
+data ??
+<String, dynamic>{},
+);
+
+return _parseResponse(
+response,
+);
+} on DioException catch (error) {
+debugPrint(
+'Bildirim POST hatası: '
+'${error.response?.data ?? error.message}',
+);
+
+return _handleDioException(
+error,
+);
+} catch (error) {
+debugPrint(
+'Bildirim POST beklenmeyen hata: '
+'$error',
+);
+
+return _connectionError();
+}
+}
+
+// =======================================================
+// CEVABI DÖNÜŞTÜR
+// =======================================================
+
+Map<String, dynamic> _parseResponse(
+Response<dynamic> response,
+) {
+final int statusCode =
+response.statusCode ?? 0;
+
+final Map<String, dynamic> data =
+_convertToMap(
+response.data,
+);
+
+if (
+statusCode >= 200 &&
+statusCode < 300
+) {
+data.putIfAbsent(
+'success',
+() => true,
+);
+
+data['status_code'] =
+statusCode;
+
+return data;
+}
+
+return <String, dynamic>{
+...data,
+'success':
+false,
+'status_code':
+statusCode,
+'error':
+data['error']
+?.toString() ??
+'İşlem gerçekleştirilemedi.',
+};
+}
   // =======================================================
   // DIO HATASI
   // =======================================================
@@ -270,14 +400,16 @@ class NotificationService {
         error.response;
 
     if (response != null) {
-      return _parseResponse(response);
+      return _parseResponse(
+        response,
+      );
     }
 
     switch (error.type) {
-      case DioExceptionType.transformTimeout:
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
+      case DioExceptionType.transformTimeout:
         return <String, dynamic>{
           'success': false,
           'error':
@@ -348,6 +480,23 @@ class NotificationService {
       'data': value,
     };
   }
+
+  // =======================================================
+  // KULLANICI ID ÇÖZÜMLEME HATASI
+  // =======================================================
+
+  Map<String, dynamic>
+  _userResolutionError() {
+    return <String, dynamic>{
+      'success': false,
+      'error':
+      'Kullanıcı bilgisi çözümlenemedi.',
+    };
+  }
+
+  // =======================================================
+  // BAĞLANTI HATASI
+  // =======================================================
 
   Map<String, dynamic>
   _connectionError() {
