@@ -3,10 +3,10 @@ import 'package:flutter/foundation.dart';
 
 class ApiService {
 static const String _baseUrl =
-'http://10.0.2.2:3000/api';
+    'https://evrak-backend-production.up.railway.app/api';
 
 static const String _serverUrl =
-'http://10.0.2.2:3000';
+    'https://evrak-backend-production.up.railway.app';
 
 final Dio _dio = Dio(
 BaseOptions(

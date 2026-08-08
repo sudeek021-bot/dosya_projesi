@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 
 class ReportService {
   static const String _baseUrl =
-      'http://10.0.2.2:3000/api';
+      'https://evrak-backend-production.up.railway.app/api';
 
   final Dio _dio = Dio(
     BaseOptions(

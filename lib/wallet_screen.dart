@@ -238,9 +238,9 @@ _showMessage(
 return;
 }
 
-if (amount < 250) {
+if (amount < 50) {
 _showMessage(
-"Minimum para çekme tutarı 250,00 TL'dir.",
+"Minimum para çekme tutarı 50,00 TL'dir.",
 );
 
 return;
